@@ -53,8 +53,8 @@ def create_app() -> FastAPI:
         title=f"{settings.APP_NAME} API",
         version=settings.APP_VERSION,
         description="AI-powered health diet recommendation for programmers",
-        docs_url="/docs" if settings.DEBUG else None,
-        redoc_url="/redoc" if settings.DEBUG else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan if not _IS_SERVERLESS else None,
     )
 
