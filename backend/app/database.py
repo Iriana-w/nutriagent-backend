@@ -31,6 +31,9 @@ class Base(DeclarativeBase):
 
 
 # --- Engine ---
+# Auto-detect SSL requirement: Supabase requires SSL, localhost does not
+_ssl_mode = "require" if any(k in settings.DATABASE_URL for k in ("supabase", "neon")) else "prefer"
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DB_ECHO,
@@ -41,6 +44,7 @@ engine = create_async_engine(
         "server_settings": {
             "application_name": f"{settings.APP_NAME.lower()}_backend",
         },
+        "ssl": _ssl_mode,
     },
 )
 

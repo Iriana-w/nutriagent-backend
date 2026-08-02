@@ -48,14 +48,17 @@ async def setup():
         print(f"       Make sure PostgreSQL is running on {DB_HOST}:{DB_PORT}")
         return
 
-    # Check if nutriagent DB exists
+    # Check if target DB exists (skip on Supabase/cloud — only 'postgres' DB is available)
     exists = await conn.fetchval(
         "SELECT 1 FROM pg_database WHERE datname = $1", DB_NAME
     )
     if not exists:
-        print(f"       Creating database '{DB_NAME}'...")
-        await conn.execute(f'CREATE DATABASE "{DB_NAME}"')
-        print("       Created!")
+        if any(k in (DB_HOST or "") for k in ("supabase", "railway", "neon", "rds.amazonaws")):
+            print(f"       ⚠️  Cloud hosting detected — skipping CREATE DATABASE. Using '{DB_NAME}' (must already exist).")
+        else:
+            print(f"       Creating database '{DB_NAME}'...")
+            await conn.execute(f'CREATE DATABASE "{DB_NAME}"')
+            print("       Created!")
     else:
         print(f"       Database '{DB_NAME}' already exists.")
     await conn.close()

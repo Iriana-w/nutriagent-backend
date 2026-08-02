@@ -33,8 +33,10 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # --- Database ---
-    DATABASE_URL: str = "postgresql+asyncpg://nutriagent:nutriagent@localhost:5432/nutriagent"
-    DATABASE_SYNC_URL: str = "postgresql://nutriagent:nutriagent@localhost:5432/nutriagent"
+    # Supports: local PostgreSQL, Supabase, Railway
+    # Set via .env or environment variable (Railway injects DATABASE_URL automatically)
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
+    DATABASE_SYNC_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False
