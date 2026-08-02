@@ -135,14 +135,33 @@ def create_app() -> FastAPI:
             res["error"] = f"{type(e).__name__}: {str(e)[:300]}"
         return res
 
+    @app.get("/api/v1/debug/auth-check", tags=["Debug"])
+    async def auth_check():
+        """Check auth prerequisites."""
+        res = {}
+        try:
+            async with engine.connect() as conn:
+                from sqlalchemy import text
+                r = await conn.execute(text("SELECT count(*), bool_or(is_admin) FROM users WHERE is_active=true"))
+                total, has_admin = r.fetchone()
+                res["active_users"] = total
+                res["has_admin"] = bool(has_admin)
+                r = await conn.execute(text("SELECT email, is_admin, is_active FROM users LIMIT 5"))
+                res["sample_users"] = [{"email": row[0], "is_admin": row[1], "is_active": row[2]} for row in r.fetchall()]
+        except Exception as e:
+            res["db_error"] = str(e)[:200]
+        res["jwt_secret_set"] = bool(settings.JWT_SECRET_KEY)
+        try:
+            from app.redis import get_redis
+            r = await get_redis()
+            res["redis"] = "connected" if r else "not configured (degraded)"
+        except Exception as e:
+            res["redis"] = f"error: {e}"
+        return res
+
     return app
 
 def _safe_url(url: str) -> str:
-    """Mask password in connection URL for safe logging."""
-    if "@" in url:
-        parts = url.split("@")
-        return f"...@{parts[-1]}"
-    return url
 
 
 # ── Direct run ──────────────────────────────────────────
