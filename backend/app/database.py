@@ -51,8 +51,9 @@ def _build_engine():
         "connect_args": {
             "server_settings": {"application_name": f"{settings.APP_NAME.lower()}_backend"},
             "ssl": _SSL_MODE,
-            "timeout": 10,           # connection timeout
-            "command_timeout": 30,   # query timeout
+            "timeout": 10,
+            "command_timeout": 30,
+            "statement_cache_size": 0,  # Required for PgBouncer transaction mode (Supabase Pooler 6543)
         },
     }
 
