@@ -74,4 +74,12 @@ async def _generate_scenario(state: RecommendationState) -> RecommendationState:
     return state
 
 
-scenario_graph = create_scenario_graph()
+_scenario_graph = None
+
+def get_scenario_graph():
+    global _scenario_graph
+    if _scenario_graph is None:
+        _scenario_graph = create_scenario_graph()
+    return _scenario_graph
+
+scenario_graph = get_scenario_graph  # backward compat

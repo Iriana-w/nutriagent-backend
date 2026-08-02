@@ -1,12 +1,18 @@
 """
 NutriAgent Backend — Database Connection.
 
-Provides async SQLAlchemy engine, session factory, and FastAPI dependency.
-Uses asyncpg driver for PostgreSQL 16 with pgvector support.
+Supabase PostgreSQL + Vercel Serverless ready.
+Async SQLAlchemy 2.0 with asyncpg driver.
+
+Architecture:
+  Local:   QueuePool (pool_size=5, max_overflow=5)
+  Vercel:  NullPool (one connection per request, no leaks)
+  SSL:     auto-detect — require on Supabase/Neon/Railway, prefer on localhost
 """
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -17,38 +23,60 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
+# ── ORM Base ──────────────────────────────────────────
 
-# --- ORM Base ---
+
 class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy ORM models.
-
-    Models must import this Base and subclass it.
-    All models in app.models are registered via app.models.__init__.
-    """
+    """Base for all ORM models. Models register via app.models.__init__."""
 
 
-# --- Engine ---
-# Auto-detect SSL requirement: Supabase requires SSL, localhost does not
-_ssl_mode = "require" if any(k in settings.DATABASE_URL for k in ("supabase", "neon")) else "prefer"
+# ── Runtime Detection ─────────────────────────────────
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DB_ECHO,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    connect_args={
-        "server_settings": {
-            "application_name": f"{settings.APP_NAME.lower()}_backend",
+_IS_SERVERLESS = bool(os.environ.get("VERCEL_DEPLOYMENT"))
+_SUPABASE_HOST = "supabase" in settings.DATABASE_URL
+_SSL_MODE = "require" if any(k in settings.DATABASE_URL for k in ("supabase", "neon", "railway")) else "prefer"
+
+
+# ── Engine (created lazily on first query, no startup connect) ─
+
+def _build_engine():
+    """Build the async engine. Called once at module import — no actual DB connect yet."""
+    common = {
+        "echo": settings.DB_ECHO,
+        "pool_pre_ping": True,  # verify connection alive before each use
+        "connect_args": {
+            "server_settings": {"application_name": f"{settings.APP_NAME.lower()}_backend"},
+            "ssl": _SSL_MODE,
+            "timeout": 10,           # connection timeout
+            "command_timeout": 30,   # query timeout
         },
-        "ssl": _ssl_mode,
-    },
-)
+    }
 
-# --- Session Factory ---
+    if _IS_SERVERLESS:
+        # Vercel: each request gets its own connection, no pooling
+        return create_async_engine(
+            settings.DATABASE_URL,
+            poolclass=NullPool,
+            **common,
+        )
+    else:
+        # Local/Server: small connection pool
+        return create_async_engine(
+            settings.DATABASE_URL,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            **common,
+        )
+
+
+engine = _build_engine()
+
+# ── Session Factory ───────────────────────────────────
+
 async_session_factory = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -57,9 +85,10 @@ async_session_factory = async_sessionmaker(
 )
 
 
-# --- FastAPI Dependency ---
+# ── FastAPI Dependency ────────────────────────────────
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session. Rolls back on exception, closes after use."""
+    """Per-request DB session. Commits on success, rolls back on error."""
     async with async_session_factory() as session:
         try:
             yield session
@@ -69,9 +98,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-# --- Utility: get a session for scripts / agents ---
+# ── Agent / Script Session ────────────────────────────
+
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Standalone session for agents/scripts. No auto-commit."""
     async with async_session_factory() as session:
         try:
             yield session
@@ -80,9 +111,10 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-# --- Health Check ---
+# ── Health Check ──────────────────────────────────────
+
 async def check_db_health() -> bool:
-    """Return True if the database is reachable."""
+    """Return True if database is reachable."""
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -91,7 +123,8 @@ async def check_db_health() -> bool:
         return False
 
 
-# --- Shutdown ---
+# ── Shutdown ──────────────────────────────────────────
+
 async def dispose_engine() -> None:
-    """Dispose the database engine (call on app shutdown)."""
+    """Dispose the engine (call on app shutdown, local only)."""
     await engine.dispose()

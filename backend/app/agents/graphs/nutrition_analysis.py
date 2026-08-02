@@ -425,7 +425,15 @@ def create_nutrition_analysis_graph() -> StateGraph:
 
 
 # Module-level compiled graph
-nutrition_analysis_graph = create_nutrition_analysis_graph()
+_nutrition_analysis_graph = None
+
+def get_nutrition_analysis_graph():
+    global _nutrition_analysis_graph
+    if _nutrition_analysis_graph is None:
+        _nutrition_analysis_graph = create_nutrition_analysis_graph()
+    return _nutrition_analysis_graph
+
+nutrition_analysis_graph = get_nutrition_analysis_graph  # backward compat
 
 
 # ============================================================================

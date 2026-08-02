@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     # Set via .env or environment variable (Railway injects DATABASE_URL automatically)
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
     DATABASE_SYNC_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_SIZE: int = 5   # Serverless-friendly default (was 20)
+    DB_MAX_OVERFLOW: int = 5  # Serverless-friendly default (was 10)
     DB_ECHO: bool = False
 
     # --- Redis ---
@@ -60,7 +60,12 @@ class Settings(BaseSettings):
     DEEP_LLM_MODEL: str = "claude-sonnet-4-20250514"
 
     # --- CORS ---
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # Supports comma-separated string (Railway/Vercel env var compatible)
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     # --- Rate Limiting ---
     RATE_LIMIT_PER_MINUTE: int = 60

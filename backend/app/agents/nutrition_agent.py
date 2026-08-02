@@ -11,7 +11,7 @@ Usage:
 
 from __future__ import annotations
 
-from app.agents.graphs.nutrition_analysis import nutrition_analysis_graph
+from app.agents.graphs.nutrition_analysis import get_nutrition_analysis_graph
 from app.agents.nutrition_state import NutritionAgentState
 from app.schemas.nutrition_agent import FoodRecord, NutritionAnalysis
 
@@ -31,24 +31,17 @@ class NutritionAgent:
     """
 
     def __init__(self):
-        self._graph = nutrition_analysis_graph
+        self._compiled_graph = None
+
+    def _get_graph(self):
+        if self._compiled_graph is None:
+            self._compiled_graph = get_nutrition_analysis_graph()
+        return self._compiled_graph
 
     async def analyze(self, food_record: FoodRecord) -> NutritionAnalysis:
-        """
-        Run the full nutrition analysis pipeline on a FoodRecord.
-
-        Args:
-            food_record: Complete food record for a single day
-
-        Returns:
-            NutritionAnalysis with health score, dimension scores, and AI insights
-
-        Raises:
-            ValueError: If the FoodRecord is invalid
-        """
+        """Run the full nutrition analysis pipeline on a FoodRecord."""
         initial_state = NutritionAgentState(food_record=food_record)
-
-        result = await self._graph.ainvoke(initial_state)
+        result = await self._get_graph().ainvoke(initial_state)
 
         # result is a NutritionAgentState (dict when ainvoke returns)
         if isinstance(result, dict):

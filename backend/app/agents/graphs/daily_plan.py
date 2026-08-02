@@ -66,4 +66,12 @@ async def _generate_daily_plan(state: RecommendationState) -> RecommendationStat
     return state
 
 
-daily_plan_graph = create_daily_plan_graph()
+_daily_plan_graph = None
+
+def get_daily_plan_graph():
+    global _daily_plan_graph
+    if _daily_plan_graph is None:
+        _daily_plan_graph = create_daily_plan_graph()
+    return _daily_plan_graph
+
+daily_plan_graph = get_daily_plan_graph  # backward compat

@@ -733,5 +733,13 @@ def _should_retry_generation(state: RecommendationAgentState) -> str:
     return "end"
 
 
-# Module-level compiled graph
-next_meal_recommend_graph = create_next_meal_recommend_graph()
+# Lazy compiled graph (Vercel-friendly cold start)
+_next_meal_recommend_graph = None
+
+def get_next_meal_recommend_graph():
+    global _next_meal_recommend_graph
+    if _next_meal_recommend_graph is None:
+        _next_meal_recommend_graph = create_next_meal_recommend_graph()
+    return _next_meal_recommend_graph
+
+next_meal_recommend_graph = get_next_meal_recommend_graph  # backward compat

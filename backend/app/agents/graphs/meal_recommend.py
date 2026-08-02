@@ -79,5 +79,13 @@ def _should_retry(state: RecommendationState) -> str:
     return "end"
 
 
-# Create and export the compiled graph
-meal_recommend_graph = create_meal_recommend_graph()
+# Lazy: compiled on first call (Vercel-friendly cold start)
+_meal_recommend_graph = None
+
+def get_meal_recommend_graph():
+    global _meal_recommend_graph
+    if _meal_recommend_graph is None:
+        _meal_recommend_graph = create_meal_recommend_graph()
+    return _meal_recommend_graph
+
+meal_recommend_graph = get_meal_recommend_graph  # backward compat

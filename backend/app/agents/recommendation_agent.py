@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.agents.graphs.next_meal_recommend import next_meal_recommend_graph
+from app.agents.graphs.next_meal_recommend import get_next_meal_recommend_graph
 from app.agents.recommendation_state import RecommendationAgentState
 from app.schemas.recommendation_agent import MealRecommendation, RecommendationRequest
 
@@ -36,7 +36,12 @@ class RecommendationAgent:
     """
 
     def __init__(self):
-        self._graph = next_meal_recommend_graph
+        self._compiled_graph = None
+
+    def _get_graph(self):
+        if self._compiled_graph is None:
+            self._compiled_graph = get_next_meal_recommend_graph()
+        return self._compiled_graph
 
     async def recommend(self, request: RecommendationRequest) -> MealRecommendation:
         """
@@ -65,7 +70,7 @@ class RecommendationAgent:
         )
 
         # Run the LangGraph pipeline
-        result = await self._graph.ainvoke(initial_state)
+        result = await self._get_graph().ainvoke(initial_state)
 
         if isinstance(result, dict):
             state = RecommendationAgentState(**result)

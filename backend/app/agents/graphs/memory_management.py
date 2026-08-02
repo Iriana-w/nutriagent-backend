@@ -591,4 +591,12 @@ def create_memory_graph() -> StateGraph:
 
 
 # Module-level compiled graph
-memory_graph = create_memory_graph()
+_memory_graph = None
+
+def get_memory_graph():
+    global _memory_graph
+    if _memory_graph is None:
+        _memory_graph = create_memory_graph()
+    return _memory_graph
+
+memory_graph = get_memory_graph  # backward compat

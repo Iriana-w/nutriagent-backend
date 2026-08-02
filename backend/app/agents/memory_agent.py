@@ -16,7 +16,7 @@ from uuid import UUID
 
 from app.agents.memory_state import MemoryAgentState
 from app.agents.graphs.memory_management import (
-    memory_graph,
+    get_memory_graph,
     normalize_event,
     embed_content,
     store_memory_node,
@@ -57,7 +57,12 @@ class MemoryAgent:
     """
 
     def __init__(self):
-        self._graph = memory_graph
+        self._graph = None  # Compiled on first use via _get_graph()
+
+    def _get_graph(self):
+        if self._graph is None:
+            self._graph = get_memory_graph()
+        return self._graph
 
     # =========================================================================
     # REMEMBER
