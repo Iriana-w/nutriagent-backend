@@ -55,9 +55,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     ANTHROPIC_API_KEY: str = ""
-    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
-    FAST_LLM_MODEL: str = "gpt-4o-mini"
-    DEEP_LLM_MODEL: str = "claude-sonnet-4-20250514"
+    DEFAULT_LLM_MODEL: str = "deepseek-chat"
+    FAST_LLM_MODEL: str = "deepseek-chat"
+    DEEP_LLM_MODEL: str = "deepseek-chat"
 
     # --- CORS ---
     # Supports comma-separated string (Railway/Vercel env var compatible)

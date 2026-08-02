@@ -70,7 +70,10 @@ class BaseAgent(ABC):
                     "Content-Type": "application/json",
                 },
             )
-            response.raise_for_status()
+            if not response.is_success:
+                raise RuntimeError(
+                    f"LLM {response.status_code}: {response.text[:500]}"
+                )
             data = response.json()
             return data["choices"][0]["message"]["content"]
 
