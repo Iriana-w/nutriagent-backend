@@ -100,6 +100,41 @@ def create_app() -> FastAPI:
 
         return result
 
+    @app.get("/api/v1/debug/db-check", tags=["Debug"])
+    async def db_check():
+        """Full DB diagnostics."""
+        res = {"database_url": _safe_url(settings.DATABASE_URL)}
+        try:
+            async with engine.connect() as conn:
+                from sqlalchemy import text
+                r = await conn.execute(text("SELECT version()"))
+                res["version"] = (await r.fetchone())[0][:80]
+                r = await conn.execute(text("SELECT extname FROM pg_extension ORDER BY extname"))
+                res["extensions"] = [row[0] for row in await r.fetchall()]
+                r = await conn.execute(text(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
+                ))
+                tables = [row[0] for row in await r.fetchall()]
+                expected = [
+                    "users","user_health_profiles","user_diet_types","user_health_goals",
+                    "user_allergens","user_preferences","user_caffeine_logs",
+                    "foods","food_categories","food_goal_tags","delivery_dishes",
+                    "food_logs","food_log_items","daily_nutrition_summary",
+                    "recommendation_logs","recommendation_items","meal_plans","meal_plan_items",
+                    "agent_memories","agent_memory_links","agent_preference_signals",
+                    "chat_sessions","chat_messages","notifications","prompt_templates",
+                ]
+                res["missing"] = [t for t in expected if t not in tables]
+                res["table_count"] = len(tables)
+                res["all_present"] = len(res["missing"]) == 0
+                r = await conn.execute(text("SELECT indexname FROM pg_indexes WHERE indexname LIKE '%embedding%'"))
+                res["vector_indexes"] = [row[0] for row in await r.fetchall()]
+                res["status"] = "ok" if res["all_present"] else "incomplete"
+        except Exception as e:
+            res["status"] = "error"
+            res["error"] = f"{type(e).__name__}: {str(e)[:300]}"
+        return res
+
     return app
 
 def _safe_url(url: str) -> str:
