@@ -162,6 +162,11 @@ def create_app() -> FastAPI:
     return app
 
 def _safe_url(url: str) -> str:
+    """Mask password in connection URL for safe logging."""
+    if "@" in url:
+        parts = url.split("@")
+        return f"...@{parts[-1]}"
+    return url
 
 
 # ── Direct run ──────────────────────────────────────────

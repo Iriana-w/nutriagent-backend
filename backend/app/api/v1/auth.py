@@ -28,50 +28,48 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(db: DBSession, data: RegisterRequest) -> TokenResponse:
-    """
-    Register a new user account.
-    Returns JWT token pair on success.
-    """
-    user = await register_user(
-        db,
-        nickname=data.nickname,
-        password=data.password,
-        email=data.email,
-        phone=data.phone,
-        gender=data.gender,
-    )
-
-    # Auto-login after registration
-    identifier = data.email or data.phone or ""
-    _, access_token, refresh_token, expires_in = await authenticate_user(
-        db, identifier, data.password
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=expires_in,
-    )
+    """Register a new user account."""
+    import traceback
+    try:
+        user = await register_user(
+            db, nickname=data.nickname, password=data.password,
+            email=data.email, phone=data.phone, gender=data.gender,
+        )
+        identifier = data.email or data.phone or ""
+        _, access_token, refresh_token, expires_in = await authenticate_user(
+            db, identifier, data.password
+        )
+        return TokenResponse(
+            access_token=access_token, refresh_token=refresh_token,
+            token_type="bearer", expires_in=expires_in,
+        )
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail={
+            "error": type(e).__name__, "message": str(e),
+            "traceback": traceback.format_exc()[-600:],
+        })
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(db: DBSession, data: LoginRequest) -> TokenResponse:
-    """
-    Login with email/phone + password.
-    Returns JWT access and refresh tokens.
-    """
-    field, value = data.get_identifier()
-    _, access_token, refresh_token, expires_in = await authenticate_user(
-        db, value, data.password
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=expires_in,
-    )
+    """Login with email/phone + password."""
+    import traceback
+    from fastapi import HTTPException
+    try:
+        field, value = data.get_identifier()
+        _, access_token, refresh_token, expires_in = await authenticate_user(
+            db, value, data.password
+        )
+        return TokenResponse(
+            access_token=access_token, refresh_token=refresh_token,
+            token_type="bearer", expires_in=expires_in,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error": type(e).__name__, "message": str(e),
+            "traceback": traceback.format_exc()[-600:],
+        })
 
 
 @router.post("/refresh", response_model=TokenResponse)
