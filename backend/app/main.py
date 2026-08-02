@@ -20,7 +20,7 @@ from app.api.v1.router import api_v1_router
 from app.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.middleware import register_middleware
-from app.database import check_db_health, dispose_engine
+from app.database import check_db_health, dispose_engine, engine
 from app.redis import close_redis, get_redis
 
 logging.basicConfig(
@@ -72,14 +72,42 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/health", tags=["System"])
     async def health_check():
-        db_ok = await check_db_health()
-        return {
-            "status": "ok" if db_ok else "degraded",
+        import traceback
+
+        result = {
+            "status": "ok",
             "version": settings.APP_VERSION,
-            "database": "connected" if db_ok else "unavailable",
+            "database": "connected",
+            "database_url": _safe_url(settings.DATABASE_URL),
         }
 
+        db_ok = await check_db_health()
+        if not db_ok:
+            # Try once more to get the real error
+            try:
+                from sqlalchemy import text
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+            except Exception as e:
+                result["database_error"] = f"{type(e).__name__}: {e}"
+                # Get the root cause
+                cause = e
+                while getattr(cause, "__cause__", None):
+                    cause = cause.__cause__
+                result["database_root_error"] = str(cause)[:300]
+            result["status"] = "degraded"
+            result["database"] = "unavailable"
+
+        return result
+
     return app
+
+def _safe_url(url: str) -> str:
+    """Mask password in connection URL for safe logging."""
+    if "@" in url:
+        parts = url.split("@")
+        return f"...@{parts[-1]}"
+    return url
 
 
 # ── Direct run ──────────────────────────────────────────
