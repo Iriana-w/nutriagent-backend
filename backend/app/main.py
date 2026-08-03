@@ -255,25 +255,26 @@ def create_app() -> FastAPI:
                         emb_str = None
 
                     try:
+                        # Skip embedding — just insert basic data first
                         await conn.execute(
-                            sa_text("""INSERT INTO foods (name_zh,name_en,alias,category_id,energy_kcal,protein_g,fat_g,carbs_g,fiber_g,sugar_g,sodium_mg,is_common,data_source,embedding)
-                            VALUES (:n,:e,:a,:c,:kcal,:p,:f,:cb,:fb,:sug,:na,true,'中国食物成分表',:emb::vector)
-                            ON CONFLICT (name_zh) DO NOTHING"""),
-                            {"n":f["n"],"e":f["e"],"a":f.get("a",[]),"c":cid,"kcal":f["kcal"],"p":f["p"],"f":f["f"],"cb":f["cb"],"fb":f.get("fb",0),"sug":f.get("sug",0),"na":f.get("na",0),"emb":emb_str}
+                            sa_text("""INSERT INTO foods (name_zh,name_en,alias,category_id,energy_kcal,protein_g,fat_g,carbs_g,fiber_g,sugar_g,sodium_mg,is_common,data_source)
+                            VALUES (:n,:e,:a,:c,:kcal,:p,:f,:cb,:fb,:sug,:na,true,'中国食物成分表')
+                            ON CONFLICT (name_zh) DO UPDATE SET name_zh=EXCLUDED.name_zh"""),
+                            {"n":f["n"],"e":f["e"],"a":f.get("a",[]),"c":cid,"kcal":f["kcal"],"p":f["p"],"f":f["f"],"cb":f["cb"],"fb":f.get("fb",0),"sug":f.get("sug",0),"na":f.get("na",0)}
                         )
                         added += 1
-                    except Exception:
+                    except Exception as e2:
                         skipped += 1
 
                 await conn.commit()
 
-                # Regenerate embeddings for existing foods that have null embedding
+                # Regenerate embeddings after insert
                 fixed = 0
                 r = await conn.execute(sa_text("SELECT id, name_zh, alias FROM foods WHERE embedding IS NULL"))
                 null_rows = r.fetchall()
                 for row in null_rows:
                     try:
-                        emb_text = row[1]
+                        emb_text = row[1] or ""
                         if row[2] and len(row[2]) > 0:
                             emb_text += " 别名: " + ", ".join(row[2])
                         vec = await embedding_gen.embed_text(emb_text)
