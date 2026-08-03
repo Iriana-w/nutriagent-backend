@@ -211,6 +211,7 @@ class UserHealthProfile(Base):
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
     location_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    location_source: Mapped[str | None] = mapped_column(String(32), default="gps")
 
     # Activity
     activity_level: Mapped[ActivityLevelEnum] = mapped_column(

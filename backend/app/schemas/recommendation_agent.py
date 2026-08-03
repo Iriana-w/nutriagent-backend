@@ -107,6 +107,7 @@ class RecommendationRequest(BaseModel):
     activity_level: str = "sedentary"
     spice_level: int | None = Field(None, ge=0, le=5)
     oil_level: int | None = Field(None, ge=0, le=5)
+    extra: dict = Field(default_factory=dict, description="Additional context (location, restaurants, etc.)")
 
 
 # ============================================================================
@@ -181,6 +182,9 @@ class MealRecommendation(BaseModel):
     # Additional
     tips: list[str] = Field(default_factory=list, description="额外建议")
     alternatives: list[RecommendedItem] = Field(default_factory=list, description="备选方案")
+
+    # Nearby restaurants
+    nearby_restaurants: list[dict] = Field(default_factory=list, description="附近健康餐厅")
 
     # Metadata
     model_name: str = ""

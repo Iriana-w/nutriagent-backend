@@ -12,6 +12,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.delivery import router as delivery_router
 from app.api.v1.location import router as location_router
+from app.api.v1.restaurants import router as restaurants_router
 from app.api.v1.food_logs import router as food_logs_router
 from app.api.v1.memory import router as memory_router
 from app.api.v1.nutrition import router as nutrition_router
@@ -29,3 +30,4 @@ api_v1_router.include_router(nutrition_router)
 api_v1_router.include_router(chat_router)
 api_v1_router.include_router(memory_router)
 api_v1_router.include_router(location_router)
+api_v1_router.include_router(restaurants_router)

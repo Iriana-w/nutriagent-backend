@@ -69,8 +69,20 @@ async def recommend_next_meal(
         data.user_id = UUID(user_id)
 
     import traceback
+    from app.services.recommendation_context import build_location_context
+
+    loc_ctx = {}
+    try:
+        loc_ctx = await build_location_context(UUID(user_id))
+        if loc_ctx:
+            data.extra["location"] = loc_ctx
+    except Exception:
+        pass  # Location enrichment is best-effort
+
     try:
         result = await recommendation_agent.recommend(data)
+        if loc_ctx.get("nearby_restaurants"):
+            result.nearby_restaurants = loc_ctx["nearby_restaurants"]
         return result
     except Exception as e:
         from fastapi import HTTPException

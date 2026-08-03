@@ -9,14 +9,32 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserId, DBSession
+from app.services.amap_client import amap_client
 from app.services.location_service import reverse_geocode
 from app.services.user_service import get_or_create_health_profile
 
 router = APIRouter(prefix="/location", tags=["Location"])
+
+
+@router.get("/current")
+async def get_current_location(
+    db: DBSession,
+    user_id: CurrentUserId,
+) -> dict:
+    """Get current user's saved location."""
+    profile = await get_or_create_health_profile(db, UUID(user_id))
+    return {
+        "latitude": float(profile.latitude) if profile.latitude else None,
+        "longitude": float(profile.longitude) if profile.longitude else None,
+        "city": profile.city,
+        "district": profile.district,
+        "province": profile.province,
+        "location_source": profile.location_source or "gps",
+    }
 
 
 class LocationUpdateRequest(BaseModel):
@@ -33,6 +51,55 @@ class LocationResponse(BaseModel):
     updated_at: str | None = None
 
 
+@router.get("/cities/search")
+async def search_cities(q: str = Query(..., min_length=1)):
+    """Search cities for manual selection."""
+    results = await amap_client.search_cities(q, limit=10)
+    return {"query": q, "cities": results}
+
+
+class ManualLocationRequest(BaseModel):
+    city: str
+    province: str = ""
+    adcode: str = ""
+
+
+@router.post("/manual", response_model=LocationResponse)
+async def set_manual_location(
+    db: DBSession,
+    user_id: CurrentUserId,
+    data: ManualLocationRequest,
+) -> LocationResponse:
+    """Manually set city location."""
+    try:
+        profile = await get_or_create_health_profile(db, UUID(user_id))
+
+        # Get city center from AMap
+        center = await amap_client.get_city_center(data.adcode or data.city)
+        if center and center.get("center"):
+            profile.latitude = center["center"]["lat"]
+            profile.longitude = center["center"]["lng"]
+
+        profile.city = data.city
+        profile.province = data.province
+        profile.location_source = "manual"
+        profile.location_updated_at = datetime.now(timezone.utc)
+
+        await db.flush()
+        await db.refresh(profile)
+
+        return LocationResponse(
+            latitude=float(profile.latitude) if profile.latitude else 0,
+            longitude=float(profile.longitude) if profile.longitude else 0,
+            city=profile.city, district=profile.district, province=profile.province,
+            updated_at=profile.location_updated_at.isoformat() if profile.location_updated_at else None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
+
+
 @router.post("/update", response_model=LocationResponse)
 async def update_location(
     db: DBSession,
@@ -46,10 +113,13 @@ async def update_location(
 
         profile.latitude = data.latitude
         profile.longitude = data.longitude
-        profile.city = geo.get("city")
-        profile.district = geo.get("district")
-        profile.province = geo.get("province")
+        profile.location_source = "gps"
         profile.location_updated_at = datetime.now(timezone.utc)
+
+        # Only update if AMAP returned valid data (don't overwrite with None)
+        if geo.get("city"):     profile.city = geo["city"]
+        if geo.get("district"): profile.district = geo["district"]
+        if geo.get("province"): profile.province = geo["province"]
 
         await db.flush()
         await db.refresh(profile)
