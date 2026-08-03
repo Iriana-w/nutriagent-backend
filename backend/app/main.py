@@ -263,9 +263,28 @@ def create_app() -> FastAPI:
                         skipped += 1
 
                 await conn.commit()
+
+                # Regenerate embeddings for existing foods that have null embedding
+                fixed = 0
+                r = await conn.execute(sa_text("SELECT id, name_zh, alias FROM foods WHERE embedding IS NULL"))
+                null_rows = r.fetchall()
+                for row in null_rows:
+                    try:
+                        emb_text = row[1]
+                        if row[2] and len(row[2]) > 0:
+                            emb_text += " 别名: " + ", ".join(row[2])
+                        vec = await embedding_gen.embed_text(emb_text)
+                        emb_str = embedding_gen.embedding_to_pgvector_string(vec)
+                        await conn.execute(sa_text("UPDATE foods SET embedding=:e::vector WHERE id=:id"), {"e":emb_str,"id":row[0]})
+                        fixed += 1
+                    except Exception:
+                        pass
+                await conn.commit()
+
                 result["status"] = "done"
                 result["added"] = added
                 result["skipped"] = skipped
+                result["embeddings_fixed"] = fixed
                 result["total"] = added + skipped
         except Exception as e:
             result["status"] = "error"
