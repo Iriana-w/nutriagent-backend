@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+CHINA_TZ = timezone(timedelta(hours=8))
 
 from langgraph.graph import END, StateGraph
 
@@ -440,7 +442,7 @@ def _build_user_prompt(state: RecommendationAgentState) -> str:
 """)
 
     # --- Context ---
-    now = datetime.now()
+    now = datetime.now(CHINA_TZ)
     parts.append(f"""
 ## 🕐 当前情境
 - 时间：{now.strftime('%H:%M')}

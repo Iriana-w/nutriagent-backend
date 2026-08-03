@@ -11,7 +11,9 @@ Usage:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+CHINA_TZ = timezone(timedelta(hours=8))
 
 from app.agents.graphs.next_meal_recommend import get_next_meal_recommend_graph
 from app.agents.recommendation_state import RecommendationAgentState
@@ -94,7 +96,7 @@ class RecommendationAgent:
     @staticmethod
     def _infer_meal_type() -> str:
         """Infer meal type from current hour."""
-        hour = datetime.now().hour
+        hour = datetime.now(CHINA_TZ).hour
         if 6 <= hour < 10:
             return "breakfast"
         elif 10 <= hour < 14:

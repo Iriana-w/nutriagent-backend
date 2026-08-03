@@ -9,7 +9,9 @@ Gathers all contextual information needed for personalized recommendations:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+CHINA_TZ = timezone(timedelta(hours=8))
 
 from app.agents.state import RecommendationState
 from app.tools.user_context import UserContext
@@ -40,7 +42,7 @@ class ContextAssembler:
     @staticmethod
     def _build_time_context() -> dict:
         """Build time-of-day, day-of-week, and seasonal context."""
-        now = datetime.now()
+        now = datetime.now(CHINA_TZ)
         hour = now.hour
         month = now.month
         weekday = now.weekday()  # 0=Monday

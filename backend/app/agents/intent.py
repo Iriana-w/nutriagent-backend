@@ -54,9 +54,9 @@ class IntentClassifier:
 
     async def classify(self, state: RecommendationState) -> RecommendationState:
         """Classify the intent and update state."""
-        from datetime import datetime
+        from datetime import datetime, timezone, timedelta
 
-        now = datetime.now()
+        now = datetime.now(timezone(timedelta(hours=8)))
         current_time = now.strftime("%H:%M")
         inferred_meal = self._infer_meal_type(now.hour)
 
