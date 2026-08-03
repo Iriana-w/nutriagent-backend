@@ -39,10 +39,15 @@ async def reverse_geocode(lat: float, lng: float) -> dict:
                 return {}
 
             addr = data["regeocode"].get("addressComponent", {})
+
+            def _s(val):
+                """Coerce AMap response to string (handles empty arrays)."""
+                return val if isinstance(val, str) else ""
+
             return {
-                "province": addr.get("province", ""),
-                "city": addr.get("city", addr.get("province", "")),
-                "district": addr.get("district", ""),
+                "province": _s(addr.get("province", "")),
+                "city": _s(addr.get("city", addr.get("province", ""))),
+                "district": _s(addr.get("district", "")),
             }
     except Exception:
         return {}
