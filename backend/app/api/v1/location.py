@@ -74,11 +74,11 @@ async def set_manual_location(
     try:
         profile = await get_or_create_health_profile(db, UUID(user_id))
 
-        # Get city center from AMap
-        center = await amap_client.get_city_center(data.adcode or data.city)
-        if center and center.get("center"):
-            profile.latitude = center["center"]["lat"]
-            profile.longitude = center["center"]["lng"]
+        # Get city center from AMap (search cities then get center)
+        centers = await amap_client.search_cities(data.adcode or data.city, limit=1)
+        if centers and centers[0].get("center"):
+            profile.latitude = centers[0]["center"]["lat"]
+            profile.longitude = centers[0]["center"]["lng"]
 
         profile.city = data.city
         profile.province = data.province
