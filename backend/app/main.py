@@ -167,13 +167,6 @@ def create_app() -> FastAPI:
         try:
             async with engine.connect() as conn:
                 from sqlalchemy import text as sa_text
-                # Add unique constraint
-                try:
-                    await conn.execute(sa_text("ALTER TABLE foods ADD CONSTRAINT foods_name_zh_key UNIQUE (name_zh)"))
-                    await conn.commit()
-                    result["constraint"] = "added"
-                except Exception:
-                    result["constraint"] = "already exists or skipped"
 
                 # Insert seed data
                 from app.tools.embedding import embedding_gen
