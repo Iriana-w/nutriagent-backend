@@ -22,12 +22,17 @@ async def main():
     conn = await asyncpg.connect(DB_URL, statement_cache_size=0)
     print(f"Connected: ...@{DB_URL.split('@')[-1] if '@' in DB_URL else 'localhost'}")
 
-    # Find foods with null embedding
+    # Find foods with null embedding (batch of 10 per run)
+    BATCH = 10
     rows = await conn.fetch(
-        "SELECT id, name_zh, alias, category_id FROM foods WHERE embedding IS NULL"
+        "SELECT id, name_zh, alias, category_id FROM foods WHERE embedding IS NULL LIMIT $1", BATCH
     )
     total = len(rows)
-    print(f"Foods needing embeddings: {total}")
+    if total == 0:
+        print("All embeddings complete — nothing to do.")
+        await conn.close()
+        return
+    print(f"Foods in this batch: {total}")
 
     ok = 0
     fail = 0

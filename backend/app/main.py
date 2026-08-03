@@ -159,6 +159,16 @@ def create_app() -> FastAPI:
             res["redis"] = f"error: {e}"
         return res
 
+    @app.post("/api/v1/debug/db-query", tags=["Debug"])
+    async def db_query(query: dict):
+        """Run a diagnostic SQL query (debug only)."""
+        from sqlalchemy import text as sa_text
+        async with engine.connect() as conn:
+            r = await conn.execute(sa_text(query["query"]))
+            cols = r.keys()
+            rows = [dict(zip(cols, [str(v) for v in row])) for row in r.fetchall()]
+            return {"columns": list(cols), "rows": rows, "count": len(rows)}
+
     @app.get("/api/v1/debug/foods-count", tags=["Debug"])
     async def foods_count():
         from sqlalchemy import text as sa_text
@@ -179,8 +189,6 @@ def create_app() -> FastAPI:
                 from sqlalchemy import text as sa_text
 
                 # Insert seed data
-                from app.tools.embedding import embedding_gen
-
                 SEED = [
                     {"n":"白米饭","e":"Steamed Rice","a":["米饭","大米饭"],"c":"staple","kcal":116,"p":2.6,"f":0.3,"cb":25.6,"fb":0.3,"sug":0.1,"na":2},
                     {"n":"馒头","e":"Steamed Bun","a":["馍馍","白面馒头"],"c":"staple","kcal":223,"p":7.0,"f":1.1,"cb":44.2,"fb":1.3,"sug":2.0,"na":165},
@@ -245,21 +253,11 @@ def create_app() -> FastAPI:
                 for f in SEED:
                     cid = cat_map.get(f["c"])
                     if not cid: continue
-                    emb_text = f["n"]
-                    if f.get("a"): emb_text += " 别名: " + ", ".join(f["a"])
-                    emb_text += f" 类别: {f['c']}"
                     try:
-                        vec = await embedding_gen.embed_text(emb_text)
-                        emb_str = embedding_gen.embedding_to_pgvector_string(vec)
-                    except Exception:
-                        emb_str = None
-
-                    try:
-                        # Skip embedding — just insert basic data first
                         await conn.execute(
                             sa_text("""INSERT INTO foods (name_zh,name_en,alias,category_id,energy_kcal,protein_g,fat_g,carbs_g,fiber_g,sugar_g,sodium_mg,is_common,data_source)
                             VALUES (:n,:e,:a,:c,:kcal,:p,:f,:cb,:fb,:sug,:na,true,'中国食物成分表')
-                            ON CONFLICT (name_zh) DO UPDATE SET name_zh=EXCLUDED.name_zh"""),
+                            ON CONFLICT (name_zh) DO NOTHING"""),
                             {"n":f["n"],"e":f["e"],"a":f.get("a",[]),"c":cid,"kcal":f["kcal"],"p":f["p"],"f":f["f"],"cb":f["cb"],"fb":f.get("fb",0),"sug":f.get("sug",0),"na":f.get("na",0)}
                         )
                         added += 1
@@ -268,27 +266,16 @@ def create_app() -> FastAPI:
 
                 await conn.commit()
 
-                # Regenerate embeddings after insert
-                fixed = 0
-                r = await conn.execute(sa_text("SELECT id, name_zh, alias FROM foods WHERE embedding IS NULL"))
-                null_rows = r.fetchall()
-                for row in null_rows:
-                    try:
-                        emb_text = row[1] or ""
-                        if row[2] and len(row[2]) > 0:
-                            emb_text += " 别名: " + ", ".join(row[2])
-                        vec = await embedding_gen.embed_text(emb_text)
-                        emb_str = embedding_gen.embedding_to_pgvector_string(vec)
-                        await conn.execute(sa_text("UPDATE foods SET embedding=:e::vector WHERE id=:id"), {"e":emb_str,"id":row[0]})
-                        fixed += 1
-                    except Exception:
-                        pass
-                await conn.commit()
+                # Note: embeddings are generated separately via:
+                #   python scripts/generate_food_embeddings.py
+                r = await conn.execute(sa_text("SELECT count(*) FROM foods WHERE embedding IS NULL"))
+                need_emb = r.fetchone()[0]
 
                 result["status"] = "done"
                 result["added"] = added
                 result["skipped"] = skipped
-                result["embeddings_fixed"] = fixed
+                result["needs_embedding"] = need_emb
+                result["note"] = "Run: python scripts/generate_food_embeddings.py" if need_emb > 0 else "All embeddings complete"
                 result["total"] = added + skipped
         except Exception as e:
             result["status"] = "error"

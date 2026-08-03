@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     # --- External Services ---
     MEITUAN_API_KEY: str = ""
     ELEME_API_KEY: str = ""
+    AMAP_API_KEY: str = ""  # 高德地图 API Key (逆地理编码)
 
     @property
     def is_production(self) -> bool:

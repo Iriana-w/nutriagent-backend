@@ -204,6 +204,14 @@ class UserHealthProfile(Base):
         Float(4), default=50, server_default=text("50")
     )
 
+    # Location
+    city: Mapped[str | None] = mapped_column(String(64))
+    district: Mapped[str | None] = mapped_column(String(64))
+    province: Mapped[str | None] = mapped_column(String(64))
+    latitude: Mapped[float | None] = mapped_column(Float(10))
+    longitude: Mapped[float | None] = mapped_column(Float(10))
+    location_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Activity
     activity_level: Mapped[ActivityLevelEnum] = mapped_column(
         Enum(ActivityLevelEnum, name="activity_level_enum", create_type=False),
