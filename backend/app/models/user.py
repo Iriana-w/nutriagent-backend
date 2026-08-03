@@ -208,8 +208,8 @@ class UserHealthProfile(Base):
     city: Mapped[str | None] = mapped_column(String(64))
     district: Mapped[str | None] = mapped_column(String(64))
     province: Mapped[str | None] = mapped_column(String(64))
-    latitude: Mapped[float | None] = mapped_column(Float(10))
-    longitude: Mapped[float | None] = mapped_column(Float(10))
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
     location_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Activity
