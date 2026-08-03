@@ -171,16 +171,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/debug/agent-traces", tags=["Debug"])
     async def agent_traces():
-        """Get all recent agent traces (admin)."""
-        from uuid import UUID
-        from app.database import get_session
-        from app.models.agent_observability import AgentRun
-        from sqlalchemy import select
-        async with get_session() as db:
-            r = await db.execute(select(AgentRun).order_by(AgentRun.created_at.desc()).limit(50))
-            traces = [{"agent": row.agent_name, "status": row.status, "latency_ms": row.latency_ms,
-                       "input": (row.input_summary or "")[:100], "created": str(row.created_at)}
-                      for row in r.scalars().all()]
+        """Get recent agent traces (raw SQL, no ORM dependency)."""
+        from sqlalchemy import text as sa_text
+        async with engine.connect() as conn:
+            r = await conn.execute(sa_text("SELECT agent_name, status, latency_ms, input_summary, created_at FROM agent_runs ORDER BY created_at DESC LIMIT 20"))
+            traces = [{"agent": row[0] or "", "status": row[1] or "", "latency_ms": row[2], "input": (row[3] or "")[:100], "created": str(row[4])} for row in r.fetchall()]
         return {"traces": traces}
 
     @app.get("/api/v1/debug/foods-count", tags=["Debug"])
