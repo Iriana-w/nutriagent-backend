@@ -23,6 +23,8 @@ from app.schemas.food_log import (
     FoodLogItemRead,
     FoodLogQueryParams,
     FoodLogRead,
+    FoodParseRequest,
+    FoodParseResponse,
 )
 from app.services.food_log_service import (
     add_item_to_log,
@@ -106,6 +108,24 @@ async def delete_log(
 ) -> None:
     """Delete a food log and all its items."""
     await delete_food_log(db, log_id, UUID(user_id))
+
+
+@router.post("/parse", response_model=FoodParseResponse)
+async def parse_food_text(
+    data: FoodParseRequest,
+    user_id: CurrentUserId,
+) -> FoodParseResponse:
+    """
+    Parse natural language food description into structured nutrition items.
+
+    Example: "早餐吃了两个鸡蛋和一杯牛奶"
+    → [{food_name:"鸡蛋", quantity:2, unit:"个", energy_kcal:143, ...}, ...]
+
+    Uses LLM for text extraction + pgvector for food database matching.
+    Items with low confidence indicate no match found in the food database.
+    """
+    from app.agents.food_parser_agent import food_parser_agent
+    return await food_parser_agent.parse(data)
 
 
 @router.post("/photo", status_code=202)

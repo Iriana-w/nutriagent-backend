@@ -138,10 +138,15 @@ class FoodLogItem(Base):
 
     # Food snapshot
     food_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    quantity: Mapped[float | None] = mapped_column(Float(5), CheckConstraint("quantity > 0"))
+    serving_unit: Mapped[str] = mapped_column(String(32), default="g", server_default=text("'g'"))
     serving_size_g: Mapped[float] = mapped_column(
         Float(7), CheckConstraint("serving_size_g > 0"), nullable=False
     )
-    serving_unit: Mapped[str] = mapped_column(String(32), default="g", server_default=text("'g'"))
+    # AI confidence score (0-1), null for manual entries
+    confidence: Mapped[float | None] = mapped_column(
+        Float(3), CheckConstraint("confidence >= 0 AND confidence <= 1")
+    )
 
     # Actual nutrition intake (per serving)
     energy_kcal: Mapped[float] = mapped_column(Float(7), nullable=False)
