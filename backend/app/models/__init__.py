@@ -35,6 +35,8 @@ from app.models.recommendation import (
     RecommendationLog,
     RecommendStatusEnum,
 )
+from app.models.agent_observability import AgentRun, RecommendationFeedback
+from app.models.user_nutrition_preference import UserNutritionPreference
 from app.models.user import (
     ActivityLevelEnum,
     DietTypeEnum,

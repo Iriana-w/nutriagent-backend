@@ -29,7 +29,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(db: DBSession, data: RegisterRequest) -> TokenResponse:
     """Register a new user account."""
-    import traceback
+    from app.core.exceptions import AuthenticationError
     try:
         user = await register_user(
             db, nickname=data.nickname, password=data.password,
@@ -43,6 +43,8 @@ async def register(db: DBSession, data: RegisterRequest) -> TokenResponse:
             access_token=access_token, refresh_token=refresh_token,
             token_type="bearer", expires_in=expires_in,
         )
+    except AuthenticationError:
+        raise  # Let global handler return 401/409
     except Exception as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail={
@@ -65,6 +67,8 @@ async def login(db: DBSession, data: LoginRequest) -> TokenResponse:
             access_token=access_token, refresh_token=refresh_token,
             token_type="bearer", expires_in=expires_in,
         )
+    except AuthenticationError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail={
             "error": type(e).__name__, "message": str(e),
