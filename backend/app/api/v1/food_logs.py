@@ -113,7 +113,6 @@ async def delete_log(
 @router.post("/parse", response_model=FoodParseResponse)
 async def parse_food_text(
     data: FoodParseRequest,
-    user_id: CurrentUserId,
 ) -> FoodParseResponse:
     """
     Parse natural language food description into structured nutrition items.
