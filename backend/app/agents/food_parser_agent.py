@@ -40,14 +40,13 @@ class FoodParserAgent:
 ## 规则
 1. quantity: 数字，如 1, 2, 半
 2. unit: 个/杯/碗/盘/份/g/ml/片/块/勺
-3. estimated_weight_g: 估算每单位克数
-   - 鸡蛋 1个≈50g, 牛奶 1杯≈250ml≈250g
+3. estimated_weight_g: 估算每单位克数（单份重量，非总重）
+   - 鸡蛋 1个≈50g, 牛奶 1杯≈250g
    - 米饭 1碗≈150g, 面包 1片≈30g
    - 肉类 1份≈100g, 蔬菜 1份≈150g
    - 水果 1个≈200g, 坚果 1把≈30g
    - 无法判断时默认 150g
-4. serving_size_g = quantity × estimated_weight_g
-5. 中文描述如"两个鸡蛋" → quantity=2, unit="个"
+4. 中文描述如"两个鸡蛋" → quantity=2, unit="个", estimated_weight_g=50
 
 只返回JSON，不要其他文字。"""
 
@@ -80,9 +79,11 @@ class FoodParserAgent:
         final_items: list[ParsedFoodItem] = []
         for item in parsed_items:
             food_name = item.get("food_name", "")
-            quantity = item.get("quantity")
+            qty = item.get("quantity") or 1.0
             unit = item.get("unit", "g")
-            est_weight = item.get("estimated_weight_g", 150)
+            per_unit_weight = item.get("estimated_weight_g", 150)
+            # Total serving = quantity × per-unit weight (e.g. 2 eggs × 50g = 100g)
+            total_serving_g = qty * per_unit_weight
 
             # Try to find in foods DB
             matched = None
@@ -97,15 +98,15 @@ class FoodParserAgent:
             except Exception as e:
                 warnings.append(f"搜索「{food_name}」失败: {str(e)[:80]}")
 
-            # Calculate nutrition
+            # Calculate nutrition (foods table = per 100g, multiply by serving ratio)
             if matched:
-                ratio = (est_weight / 100.0) if est_weight > 0 else 1.0
+                ratio = (total_serving_g / 100.0) if total_serving_g > 0 else 1.0
                 final_items.append(ParsedFoodItem(
                     food_name=matched["name_zh"],
                     food_id=matched.get("id"),
-                    quantity=quantity,
+                    quantity=qty,
                     unit=unit,
-                    serving_size_g=est_weight,
+                    serving_size_g=total_serving_g,
                     energy_kcal=round(float(matched.get("energy_kcal", 0)) * ratio, 1),
                     protein_g=round(float(matched.get("protein_g", 0)) * ratio, 1),
                     fat_g=round(float(matched.get("fat_g", 0)) * ratio, 1),
@@ -116,13 +117,13 @@ class FoodParserAgent:
                     source="db_match",
                 ))
             else:
-                # Fallback — no DB match, use LLM estimate
+                # Fallback — no DB match
                 final_items.append(ParsedFoodItem(
                     food_name=food_name,
                     food_id=None,
-                    quantity=quantity,
+                    quantity=qty,
                     unit=unit,
-                    serving_size_g=est_weight,
+                    serving_size_g=total_serving_g,
                     energy_kcal=round(item.get("estimated_kcal", 200), 1),
                     protein_g=round(item.get("estimated_protein_g", 10), 1),
                     fat_g=round(item.get("estimated_fat_g", 8), 1),
