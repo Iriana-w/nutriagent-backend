@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserId, DBSession
-from app.services.amap_client import amap_client
+from app.config import settings
 from app.services.location_service import reverse_geocode
 from app.services.user_service import get_or_create_health_profile
 
@@ -54,8 +54,26 @@ class LocationResponse(BaseModel):
 @router.get("/cities/search")
 async def search_cities(q: str = Query(..., min_length=1)):
     """Search cities for manual selection."""
-    results = await amap_client.search_cities(q, limit=10)
-    return {"query": q, "cities": results}
+    import httpx
+    try:
+        r = await httpx.AsyncClient(timeout=10.0, trust_env=False).get(
+            "https://restapi.amap.com/v3/config/district",
+            params={"key": settings.AMAP_API_KEY, "keywords": q, "subdistrict": 0, "offset": 10, "output": "json"},
+        )
+        r.raise_for_status()
+        d = r.json()
+        cities = []
+        if d.get("status") == "1" and d.get("districts"):
+            for dist in d["districts"][:10]:
+                c = dist.get("center", "0,0").split(",")
+                cities.append({
+                    "name": dist.get("name", ""), "adcode": dist.get("adcode", ""),
+                    "province": dist.get("name", ""),
+                    "center": {"lng": float(c[0]) if len(c)>0 else 0, "lat": float(c[1]) if len(c)>1 else 0},
+                })
+        return {"query": q, "cities": cities}
+    except Exception:
+        return {"query": q, "cities": []}
 
 
 class ManualLocationRequest(BaseModel):
@@ -74,11 +92,23 @@ async def set_manual_location(
     try:
         profile = await get_or_create_health_profile(db, UUID(user_id))
 
-        # Get city center from AMap (search cities then get center)
-        centers = await amap_client.search_cities(data.adcode or data.city, limit=1)
-        if centers and centers[0].get("center"):
-            profile.latitude = centers[0]["center"]["lat"]
-            profile.longitude = centers[0]["center"]["lng"]
+        # Get city center from AMap district API
+        import httpx
+        try:
+            r = await httpx.AsyncClient(timeout=10.0, trust_env=False).get(
+                "https://restapi.amap.com/v3/config/district",
+                params={"key": settings.AMAP_API_KEY, "keywords": data.adcode or data.city, "subdistrict": 0, "output": "json"},
+            )
+            r.raise_for_status()
+            d = r.json()
+            if d.get("status") == "1" and d.get("districts"):
+                center_str = d["districts"][0].get("center", "0,0")
+                parts = center_str.split(",")
+                if len(parts) == 2:
+                    profile.latitude = float(parts[1])
+                    profile.longitude = float(parts[0])
+        except Exception:
+            pass
 
         profile.city = data.city
         profile.province = data.province
