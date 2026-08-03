@@ -159,6 +159,16 @@ def create_app() -> FastAPI:
             res["redis"] = f"error: {e}"
         return res
 
+    @app.get("/api/v1/debug/foods-count", tags=["Debug"])
+    async def foods_count():
+        from sqlalchemy import text as sa_text
+        async with engine.connect() as conn:
+            r = await conn.execute(sa_text("SELECT count(*), count(*) FILTER (WHERE embedding IS NOT NULL) FROM foods"))
+            total, emb = r.fetchone()
+            r2 = await conn.execute(sa_text("SELECT name_zh FROM foods ORDER BY name_zh LIMIT 5"))
+            samples = [row[0] for row in r2.fetchall()]
+            return {"total": total, "with_embedding": emb, "samples": samples}
+
     @app.post("/api/v1/debug/seed-foods", tags=["Debug"])
     async def seed_foods_endpoint():
         """Run food seed data import (one-time setup)."""

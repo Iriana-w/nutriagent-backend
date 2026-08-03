@@ -86,14 +86,16 @@ class FoodParserAgent:
 
             # Try to find in foods DB
             matched = None
-            confidence = 0.3  # default low confidence
+            confidence = 0.3
             try:
                 results = await search_foods_semantic(query_text=food_name, limit=3)
                 if results:
                     matched = results[0]
                     confidence = 0.85 if matched.get("name_zh") == food_name else 0.6
-            except Exception:
-                pass
+                else:
+                    warnings.append(f"搜索「{food_name}」: 0 结果 (DB中有 {food_name} 吗?)")
+            except Exception as e:
+                warnings.append(f"搜索「{food_name}」失败: {str(e)[:80]}")
 
             # Calculate nutrition
             if matched:
