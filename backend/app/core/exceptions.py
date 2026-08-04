@@ -121,13 +121,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger = logging.getLogger("nutriagent")
         logger.exception("Unhandled exception: %s", exc)
 
-        from app.config import settings
-
-        detail = {}
-        if settings.DEBUG:
-            detail["traceback"] = traceback.format_exc()
-            detail["error_type"] = type(exc).__name__
-            detail["error_message"] = str(exc)
+        detail = {
+            "traceback": traceback.format_exc(),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
