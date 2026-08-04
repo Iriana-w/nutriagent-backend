@@ -174,6 +174,17 @@ async def recommend_weekly(
     return MealPlanRead.model_validate(plan)
 
 
+@router.get("/scenario/debug")
+async def scenario_debug():
+    """Quick check if scenario graph compiles and runs."""
+    try:
+        from app.agents.graphs.scenario import create_scenario_graph
+        graph = create_scenario_graph()
+        return {"status": "compiled", "graph_type": str(type(graph))}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.post("/scenario", response_model=RecommendationRead, status_code=201)
 async def recommend_scenario(
     db: DBSession,
