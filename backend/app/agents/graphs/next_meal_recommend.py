@@ -670,12 +670,116 @@ def _assemble_output(
             "retrieved_foods_count": len(state.retrieved_foods),
         },
         warnings=state.validation_warnings,
+        decision_reasons=state.decision_reasons,
     )
 
 
 # ============================================================================
 # Graph Construction
 # ============================================================================
+
+
+# ============================================================================
+# Node: Enrich Nutrition (NEW — Phase 7.6)
+# ============================================================================
+
+async def enrich_nutrition(state: RecommendationAgentState) -> RecommendationAgentState:
+    """Add adaptive nutrition context to the state for more precise recommendations."""
+    # Load adaptive goals if available
+    try:
+        from app.database import get_session
+        from sqlalchemy import text as sa_text
+        async with get_session() as db:
+            r = await db.execute(
+                sa_text("SELECT calorie_target, protein_target_g, carb_target_g, fat_target_g, reason_text, is_adjusted FROM adaptive_nutrition_goals WHERE user_id = :uid ORDER BY created_at DESC LIMIT 1"),
+                {"uid": state.user_id},
+            )
+            row = r.fetchone()
+            if row and row.is_adjusted:
+                state.nutrition_context = {
+                    "calorie_target": row.calorie_target,
+                    "protein_target_g": row.protein_target_g,
+                    "carb_target_g": row.carb_target_g,
+                    "fat_target_g": row.fat_target_g,
+                    "reason": row.reason_text or "",
+                }
+    except Exception:
+        state.nutrition_context = {}
+    return state
+
+
+# ============================================================================
+# Node: Enrich Preferences (NEW — Phase 7.6)
+# ============================================================================
+
+async def enrich_preferences(state: RecommendationAgentState) -> RecommendationAgentState:
+    """Enrich food candidates with user preference signals from memory."""
+    try:
+        from app.database import get_session
+        from sqlalchemy import text as sa_text
+        async with get_session() as db:
+            r = await db.execute(
+                sa_text("SELECT content, memory_type, confidence FROM agent_memories WHERE user_id = :uid AND memory_type = 'preference' ORDER BY importance DESC, created_at DESC LIMIT 30"),
+                {"uid": state.user_id},
+            )
+            rows = r.fetchall()
+            liked = set()
+            disliked = set()
+            for row in rows:
+                content = (row.content or "").lower()
+                if any(w in content for w in ['喜欢', '爱吃', 'like', 'prefer']):
+                    for word in content.replace('喜欢',' ').replace('爱吃',' ').split():
+                        if len(word) >= 2:
+                            liked.add(word)
+                if any(w in content for w in ['不喜欢', '不吃', '讨厌', 'dislike', 'avoid']):
+                    for word in content.replace('不喜欢',' ').replace('不吃',' ').split():
+                        if len(word) >= 2:
+                            disliked.add(word)
+            state.preference_signals = {
+                "liked_foods": list(liked)[:10],
+                "disliked_foods": list(disliked)[:10],
+            }
+    except Exception:
+        state.preference_signals = {"liked_foods": [], "disliked_foods": []}
+
+    # Add preference context to goal requirements for the prompt
+    if state.preference_signals.get("disliked_foods"):
+        state.avoided_foods = list(set(state.avoided_foods + state.preference_signals["disliked_foods"]))
+    if state.preference_signals.get("liked_foods") and state.goal_food_requirements:
+        pref_foods = state.preference_signals["liked_foods"]
+        existing = state.goal_food_requirements.get("用户偏好", [])
+        state.goal_food_requirements["用户偏好"] = existing + pref_foods[:5]
+
+    return state
+
+
+# ============================================================================
+# Node: Decision Reason (NEW — Phase 7.6)
+# ============================================================================
+
+async def decision_reason(state: RecommendationAgentState) -> RecommendationAgentState:
+    """Generate explainable decision reasons based on multi-agent analysis."""
+    reasons = []
+
+    if state.nutrition_context and state.nutrition_context.get("reason"):
+        reasons.append(f"营养目标: {state.nutrition_context['reason']}")
+
+    if state.history_gaps:
+        reasons.append(f"营养缺口: {'; '.join(state.history_gaps[:3])}")
+
+    if state.preference_signals:
+        liked = state.preference_signals.get("liked_foods", [])
+        disliked = state.preference_signals.get("disliked_foods", [])
+        if liked:
+            reasons.append(f"偏好匹配: 包含 {', '.join(liked[:3])}")
+        if disliked:
+            reasons.append(f"已排除: {', '.join(disliked[:3])}")
+
+    if state.goal_context_prompt:
+        reasons.append("健康目标对齐")
+
+    state.decision_reasons = reasons
+    return state
 
 
 def create_next_meal_recommend_graph() -> StateGraph:
@@ -697,17 +801,23 @@ def create_next_meal_recommend_graph() -> StateGraph:
 
     workflow.add_node("analyze_history", analyze_history)
     workflow.add_node("align_goals", align_goals)
+    workflow.add_node("enrich_nutrition", enrich_nutrition)
     workflow.add_node("plan_budget", plan_budget)
     workflow.add_node("retrieve_foods", retrieve_foods)
+    workflow.add_node("enrich_preferences", enrich_preferences)
     workflow.add_node("generate", generate)
+    workflow.add_node("decision_reason", decision_reason)
     workflow.add_node("validate", validate)
 
     workflow.set_entry_point("analyze_history")
     workflow.add_edge("analyze_history", "align_goals")
-    workflow.add_edge("align_goals", "plan_budget")
+    workflow.add_edge("align_goals", "enrich_nutrition")
+    workflow.add_edge("enrich_nutrition", "plan_budget")
     workflow.add_edge("plan_budget", "retrieve_foods")
-    workflow.add_edge("retrieve_foods", "generate")
-    workflow.add_edge("generate", "validate")
+    workflow.add_edge("retrieve_foods", "enrich_preferences")
+    workflow.add_edge("enrich_preferences", "generate")
+    workflow.add_edge("generate", "decision_reason")
+    workflow.add_edge("decision_reason", "validate")
 
     # Conditional retry on validation errors
     workflow.add_conditional_edges(

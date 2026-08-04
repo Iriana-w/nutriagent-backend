@@ -186,6 +186,9 @@ class MealRecommendation(BaseModel):
     # Nearby restaurants
     nearby_restaurants: list[dict] = Field(default_factory=list, description="附近健康餐厅")
 
+    # Phase 7.6: Multi-Agent decision reasons
+    decision_reasons: list[str] = Field(default_factory=list, description="多Agent协同决策理由")
+
     # Metadata
     model_name: str = ""
     analysis_summary: dict = Field(default_factory=dict, description="内部分析摘要（调试用）")

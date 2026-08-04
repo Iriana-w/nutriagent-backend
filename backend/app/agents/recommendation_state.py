@@ -79,6 +79,13 @@ class RecommendationAgentState:
     total_tokens: int | None = None
 
     # =========================================================================
+    # Phase 7.6: Multi-Agent enrichment
+    # =========================================================================
+    nutrition_context: dict[str, Any] = field(default_factory=dict)
+    preference_signals: dict[str, Any] = field(default_factory=dict)
+    decision_reasons: list[str] = field(default_factory=list)
+
+    # =========================================================================
     # Node 6: Validate
     # =========================================================================
     validation_passed: bool = False
