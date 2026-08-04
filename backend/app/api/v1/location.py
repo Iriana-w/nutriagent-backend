@@ -146,10 +146,10 @@ async def update_location(
         profile.location_source = "gps"
         profile.location_updated_at = datetime.now(timezone.utc)
 
-        # Only update if AMAP returned valid data (don't overwrite with None)
-        if geo.get("city"):     profile.city = geo["city"]
-        if geo.get("district"): profile.district = geo["district"]
-        if geo.get("province"): profile.province = geo["province"]
+        # Overwrite with GPS data, but keep fallback chain intact
+        profile.city = geo.get("city") or geo.get("district") or geo.get("province") or profile.city
+        profile.district = geo.get("district") or profile.district
+        profile.province = geo.get("province") or profile.province
 
         await db.flush()
         await db.refresh(profile)
