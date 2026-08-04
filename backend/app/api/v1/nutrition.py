@@ -146,6 +146,28 @@ def _caffeine_suggestion(today_mg: int, limit_mg: int) -> str:
     return "今天还没有咖啡因记录。适量咖啡因（<400mg/天）对提神有益。"
 
 
+async def _ensure_adaptive_table(db):
+    """Create adaptive_nutrition_goals table if not exists."""
+    from sqlalchemy import text as sa_text
+    await db.execute(sa_text("""
+        CREATE TABLE IF NOT EXISTS adaptive_nutrition_goals (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            calorie_target INTEGER,
+            protein_target_g FLOAT,
+            carb_target_g FLOAT,
+            fat_target_g FLOAT,
+            reason_text TEXT,
+            is_adjusted BOOLEAN DEFAULT false,
+            confidence FLOAT DEFAULT 0,
+            days_analyzed INTEGER DEFAULT 14,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+        )
+    """))
+    await db.commit()
+
+
 @router.get("/goals/current")
 async def get_adaptive_goals(
     db: DBSession,
@@ -154,6 +176,8 @@ async def get_adaptive_goals(
     """Get current adaptive nutrition goals (or fallback to profile defaults)."""
     from sqlalchemy import text as sa_text
     from app.models.user import UserHealthProfile
+
+    await _ensure_adaptive_table(db)
 
     # Check adaptive goals
     result = await db.execute(
@@ -211,7 +235,8 @@ async def analyze_and_adjust_goals(
     """Analyze last 14 days and generate adaptive nutrition goals."""
     from datetime import date as date_type, timedelta
     from sqlalchemy import text as sa_text
-    from app.models.user import AdaptiveNutritionGoal
+
+    await _ensure_adaptive_table(db)
 
     today = date_type.today()
     start = today - timedelta(days=14)
