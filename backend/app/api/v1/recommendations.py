@@ -200,7 +200,7 @@ async def recommend_scenario(
             user_id=UUID(user_id),
             recommend_type="scenario",
             scenario=data.scenario,
-            meal_type=data.meal_type,
+            meal_type=data.meal_type or None,
             model_name=result.get("model_name", "unknown"),
             recommendation_json=result.get("recommendation_json", {}),
             summary_text=result.get("summary_text", ""),

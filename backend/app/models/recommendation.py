@@ -29,6 +29,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.food_log import MealTypeEnum
 
 
 # ============================================================================
@@ -73,7 +74,9 @@ class RecommendationLog(Base):
     # Metadata
     recommend_type: Mapped[str] = mapped_column(String(32), nullable=False)
     scenario: Mapped[str | None] = mapped_column(String(64))
-    meal_type: Mapped[str | None] = mapped_column(String(32))  # meal_type_enum
+    meal_type: Mapped[MealTypeEnum | None] = mapped_column(
+        Enum(MealTypeEnum, name="meal_type_enum", create_type=False), nullable=True
+    )
     target_date: Mapped[date | None] = mapped_column(Date)
 
     # AI generation info
