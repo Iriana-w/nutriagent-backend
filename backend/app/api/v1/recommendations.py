@@ -186,6 +186,7 @@ async def recommend_scenario(
     """
     import traceback
     from app.services.recommendation_service import get_orchestrator
+    from app.models.recommendation import RecommendationLog, RecommendStatusEnum
 
     orchestrator = get_orchestrator()
     try:
@@ -194,6 +195,23 @@ async def recommend_scenario(
             scenario=data.scenario,
             meal_type=data.meal_type,
         )
+
+        rec = RecommendationLog(
+            user_id=UUID(user_id),
+            recommend_type="scenario",
+            scenario=data.scenario,
+            meal_type=data.meal_type,
+            model_name=result.get("model_name", "unknown"),
+            recommendation_json=result.get("recommendation_json", {}),
+            summary_text=result.get("summary_text", ""),
+            total_tokens=result.get("total_tokens"),
+            latency_ms=result.get("latency_ms"),
+            status=RecommendStatusEnum.generated,
+        )
+        db.add(rec)
+        await db.flush()
+        await db.refresh(rec)
+        return RecommendationRead.model_validate(rec)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -203,25 +221,6 @@ async def recommend_scenario(
                 "traceback": traceback.format_exc(),
             },
         )
-
-    from app.models.recommendation import RecommendationLog, RecommendStatusEnum
-
-    rec = RecommendationLog(
-        user_id=UUID(user_id),
-        recommend_type="scenario",
-        scenario=data.scenario,
-        meal_type=data.meal_type,
-        model_name=result.get("model_name", "unknown"),
-        recommendation_json=result.get("recommendation_json", {}),
-        summary_text=result.get("summary_text", ""),
-        total_tokens=result.get("total_tokens"),
-        latency_ms=result.get("latency_ms"),
-        status=RecommendStatusEnum.generated,
-    )
-    db.add(rec)
-    await db.flush()
-    await db.refresh(rec)
-    return RecommendationRead.model_validate(rec)
 
 
 @router.post("/{recommendation_id}/feedback", response_model=RecommendationRead)
