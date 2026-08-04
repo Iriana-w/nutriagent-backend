@@ -42,6 +42,20 @@ class UserContext:
             )
             prefs = prefs.scalar_one_or_none()
 
+            # Check adaptive nutrition goals (Phase 7.4) for priority kcal target
+            adaptive_kcal = None
+            try:
+                from sqlalchemy import text as sa_text
+                ar = await db.execute(
+                    sa_text("SELECT calorie_target FROM adaptive_nutrition_goals WHERE user_id = :uid AND is_adjusted = true ORDER BY created_at DESC LIMIT 1"),
+                    {"uid": str(self.user_id)},
+                )
+                arow = ar.fetchone()
+                if arow and arow.calorie_target:
+                    adaptive_kcal = int(arow.calorie_target)
+            except Exception:
+                pass
+
             # Recent 7-day food history
             seven_days_ago = date.today() - timedelta(days=7)
             recent_logs_stmt = (
@@ -69,7 +83,7 @@ class UserContext:
                 "weight_kg": float(profile.weight_kg) if profile and profile.weight_kg else None,
                 "bmi": float(profile.bmi) if profile and profile.bmi else None,
                 "bmr_kcal": profile.bmr_kcal if profile else None,
-                "daily_kcal_target": profile.daily_kcal_target if profile else 2000,
+                "daily_kcal_target": adaptive_kcal or (profile.daily_kcal_target if profile else None) or 2000,
                 "target_protein_pct": float(profile.target_protein_pct) if profile else 20,
                 "target_fat_pct": float(profile.target_fat_pct) if profile else 30,
                 "target_carbs_pct": float(profile.target_carbs_pct) if profile else 50,

@@ -100,12 +100,8 @@ class Validator:
         total_kcal = sum(
             item.get("estimated_kcal", 0) or 0 for item in state.items
         )
-        # Priority: adaptive goal > profile target > default 2000
-        daily_target = (
-            state.user_context.get("daily_kcal_target") or
-            state.user_context.get("adaptive_calorie_target") or
-            2000
-        )
+        # UserContext already applies: adaptive > profile > 2000 priority
+        daily_target = state.user_context.get("daily_kcal_target", 2000)
 
         # Expected kcal per meal type
         expected_ranges = {
