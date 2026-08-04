@@ -184,8 +184,8 @@ async def recommend_scenario(
     Generate scenario-based recommendations (e.g., overtime meals,
     eye-care foods, anti-hair-loss diet).
     """
+    import traceback
     from app.services.recommendation_service import get_orchestrator
-    from app.core.exceptions import RecommendationError
 
     orchestrator = get_orchestrator()
     try:
@@ -195,7 +195,14 @@ async def recommend_scenario(
             meal_type=data.meal_type,
         )
     except Exception as e:
-        raise RecommendationError(f"Scenario recommendation failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": type(e).__name__,
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
 
     from app.models.recommendation import RecommendationLog, RecommendStatusEnum
 
