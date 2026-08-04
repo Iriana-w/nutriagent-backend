@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, HTTPException, Path
 
 from app.agents.recommendation_agent import recommendation_agent
 from app.api.deps import CurrentUserId, DBSession, Pagination
