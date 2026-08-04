@@ -84,6 +84,67 @@ async def get_weekly_report_route(
     return await get_weekly_report(db, UUID(user_id), week_start)
 
 
+@router.get("/caffeine")
+async def get_caffeine_log(
+    db: DBSession,
+    user_id: CurrentUserId,
+    days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+) -> dict:
+    """Get caffeine intake for the last N days."""
+    from datetime import date as date_type, timedelta
+    from sqlalchemy import text as sa_text
+
+    today = date_type.today()
+    start_date = today - timedelta(days=days - 1)
+
+    result = await db.execute(
+        sa_text("""
+            SELECT log_date, total_mg, drink_count, target_limit_mg, over_limit
+            FROM user_caffeine_logs
+            WHERE user_id = :uid AND log_date >= :start_date
+            ORDER BY log_date DESC
+        """),
+        {"uid": str(user_id), "start_date": start_date},
+    )
+    rows = result.fetchall()
+
+    today_row = next((r for r in rows if r.log_date == today), None)
+    today_mg = int(today_row.total_mg) if today_row else 0
+    limit_mg = int(today_row.target_limit_mg) if today_row else 400
+    over_limit = bool(today_row.over_limit) if today_row else False
+
+    daily = []
+    for i in range(days):
+        d = today - timedelta(days=i)
+        row = next((r for r in rows if r.log_date == d), None)
+        daily.append({
+            "date": d.isoformat(),
+            "total_mg": int(row.total_mg) if row else 0,
+            "drink_count": int(row.drink_count) if row else 0,
+        })
+    daily.reverse()
+
+    suggestion = _caffeine_suggestion(today_mg, limit_mg)
+
+    return {
+        "today_mg": today_mg,
+        "limit_mg": limit_mg,
+        "over_limit": over_limit,
+        "daily": daily,
+        "suggestion": suggestion,
+    }
+
+
+def _caffeine_suggestion(today_mg: int, limit_mg: int) -> str:
+    if today_mg > limit_mg:
+        return f"今天咖啡因摄入 {today_mg}mg，已超过建议上限 {limit_mg}mg。建议减少咖啡或浓茶，多喝水帮助代谢。"
+    if today_mg > limit_mg * 0.75:
+        return f"今天咖啡因摄入 {today_mg}mg，接近上限。下午后尽量避免咖啡因摄入，以免影响睡眠。"
+    if today_mg > 0:
+        return "咖啡因摄入在合理范围内。建议下午2点后不再摄入咖啡因。"
+    return "今天还没有咖啡因记录。适量咖啡因（<400mg/天）对提神有益。"
+
+
 @router.get("/report/monthly", response_model=dict)
 async def get_monthly_report(
     db: DBSession,
