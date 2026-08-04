@@ -108,6 +108,13 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Pass through HTTPException detail (our traceback is there)
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+        if isinstance(exc, StarletteHTTPException):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"error": type(exc).__name__, "detail": str(exc.detail)},
+            )
         import logging
         import traceback
 
