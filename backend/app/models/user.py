@@ -377,3 +377,29 @@ class UserCaffeineLog(Base):
     __table_args__ = (UniqueConstraint("user_id", "log_date"),)
 
     user: Mapped[User] = relationship("User", back_populates="caffeine_logs")
+
+
+class AdaptiveNutritionGoal(Base):
+    """AI-adaptive nutrition goals based on historical diet analysis."""
+    __tablename__ = "adaptive_nutrition_goals"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    calorie_target: Mapped[int | None] = mapped_column(Integer)
+    protein_target_g: Mapped[float | None] = mapped_column(Float)
+    carb_target_g: Mapped[float | None] = mapped_column(Float)
+    fat_target_g: Mapped[float | None] = mapped_column(Float)
+    reason_text: Mapped[str | None] = mapped_column(Text)
+    is_adjusted: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    confidence: Mapped[float | None] = mapped_column(Float, default=0.0)
+    days_analyzed: Mapped[int] = mapped_column(Integer, default=14)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
